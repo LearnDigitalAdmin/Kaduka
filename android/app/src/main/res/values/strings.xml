@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kaduka</string>
+    <string name="title_activity_main">Kaduka</string>
+    <string name="package_name">com.cogvana.duka</string>
+    <string name="custom_url_scheme">com.cogvana.duka</string>
+</resources>
