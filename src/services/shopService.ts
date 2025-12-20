@@ -170,11 +170,166 @@ export const getUserShops = async (firebaseUid: string): Promise<Shop[]> => {
 };
 
 /**
+ * Patterns to skip (easy-to-guess numbers)
+ * Examples: 1111, 2222, 1234, 1122, 1010, etc.
+ */
+function isEasyPattern(id: number): boolean {
+  const str = String(id).padStart(4, '0');
+
+  // Pattern 1: All same digits (1111, 2222, etc.)
+  if (/^(.)\1{3,}$/.test(str)) {
+    return true;
+  }
+
+  // Pattern 2: Sequential ascending (1234, 2345, 5678, etc.)
+  if (/^(?:0123|1234|2345|3456|4567|5678|6789)/.test(str)) {
+    return true;
+  }
+
+  // Pattern 3: Sequential descending (4321, 3210, etc.)
+  if (/^(?:4321|3210|9876|8765|7654|6543)/.test(str)) {
+    return true;
+  }
+
+  // Pattern 4: Alternating pairs (1122, 2233, 3344, 1212, 2121, etc.)
+  if (/^(..)(?:\1|(?!.*\1)..)$/.test(str) || /^(.)(.)(?:\1\2|\2\1)$/.test(str)) {
+    return true;
+  }
+
+  // Pattern 5: Mirror patterns (1221, 1331, 2332, etc.)
+  if (/^(.)(.)(?:\2\1)$/.test(str)) {
+    return true;
+  }
+
+  // Pattern 6: Simple increment pairs (1123, 1234, 2345, etc.)
+  if (/^(.)(.)(.)\3$/.test(str) || /^(.)(.)(.)(.?)$/.test(str)) {
+    const chars = str.split('');
+    let isIncrement = true;
+    for (let i = 1; i < chars.length; i++) {
+      const diff = parseInt(chars[i]) - parseInt(chars[i - 1]);
+      if (diff !== 1 && diff !== 0) {
+        isIncrement = false;
+        break;
+      }
+    }
+    if (isIncrement && str !== '0000') {
+      return true;
+    }
+  }
+
+  // Pattern 7: All zeros (0000) and very low numbers (0001-0010)
+  if (id <= 10) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Get the next valid shop ID
+ * Reads current counter from Firestore and generates next valid ID
+ * Uses transaction to ensure atomicity and prevent collisions
+ */
+async function generateNextShopId(): Promise<string> {
+  const counterDocRef = doc(db, '_metadata', 'shopIdCounter');
+  let attempts = 0;
+  const maxAttempts = 10000;
+
+  try {
+    while (attempts < maxAttempts) {
+      attempts++; // INCREMENT THE COUNTER!
+      
+      // Use transaction to ensure atomicity
+      const result = await runTransaction(db, async (transaction) => {
+        // Read current counter
+        const counterDoc = await transaction.get(counterDocRef);
+        let currentCount = 1000; // Start from 1000 (4-digit numbers)
+
+        if (counterDoc.exists()) {
+          const data = counterDoc.data();
+          currentCount = data?.currentCount || 1000;
+        }
+
+        // Find next valid ID
+        let nextId = currentCount + 1;
+        let validIdFound = false;
+
+        while (!validIdFound && nextId <= currentCount + 1000) {
+          if (!isEasyPattern(nextId)) {
+            validIdFound = true;
+            break;
+          }
+          nextId++;
+        }
+
+        if (!validIdFound) {
+          throw new Error('Could not find valid shop ID after 1000 attempts');
+        }
+
+        // Update counter in transaction
+        transaction.set(counterDocRef, { currentCount: nextId }, { merge: true });
+
+        return nextId;
+      });
+
+      console.log('Generated new shop ID:', result);
+      return String(result);
+    }
+
+    throw new Error(`Could not generate valid shop ID after ${maxAttempts} attempts`);
+  } catch (error) {
+    console.error('Failed to generate shop ID', error);
+    throw error;
+  }
+}
+
+/**
+ * Search for a shop by shopId or national ID
+ */
+// export const getShop = async (searchTerm: string): Promise<Shop | null> => {
+//   try {
+//     // First try to find by shopId
+//     const shopRef = doc(collection(db, 'shops'), searchTerm);
+//     const shopSnap = await getDoc(shopRef);
+
+//     if (shopSnap.exists()) {
+//       return {
+//         id: shopSnap.id,
+//         ...shopSnap.data(),
+//       } as Shop;
+//     }
+
+//     // Then try to find by national ID
+//     const q = query(
+//       collection(db, 'shops'),
+//       where('nationalId', '==', searchTerm)
+//     );
+
+//     const querySnapshot = await getDocs(q);
+
+//     if (!querySnapshot.empty) {
+//       const doc = querySnapshot.docs[0];
+//       return {
+//         id: doc.id,
+//         ...doc.data(),
+//       } as Shop;
+//     }
+
+//     return null;
+//   } catch (error) {
+//     console.error('Error searching for shop:', error);
+//     throw error;
+//   }
+// };
+
+
+/**
  * Create or update a shop
  */
 export const createShop = async (shopData: Partial<Shop>): Promise<string> => {
   try {
-    const shopId = shopData.id || doc(collection(db, 'shops')).id;
+    const shopId = await generateNextShopId();
+    //const shopId = shopData.id || doc(collection(db, 'shops')).id;
     const shop: Shop = {
       id: shopId,
       ownerName: shopData.ownerName || '',

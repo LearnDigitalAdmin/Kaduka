@@ -125,6 +125,10 @@ function ProfilePage() {
                 <p className="text-xs text-gray-400">Phone</p>
                 <p className="text-sm text-white">{currentShop.phone}</p>
               </div>
+              <div>
+                <p className="text-xs text-gray-400">Shop ID</p>
+                <p className="text-sm text-white">{currentShop.id}</p>
+              </div>
             </div>
           </div>
         </div>
