@@ -101,7 +101,7 @@ export const clearStockCache = (shopId: string): void => {
 /**
  * Search stock items by name
  */
-export const searchStock = (shopId: string, query: string): StockRecord[] => {
+export const searchStock = (shopId: string, query: string): Array<{ [productName: string]: StockRecord }> => {
   const stock = getCachedStock(shopId);
   if (!stock) return [];
 
@@ -109,7 +109,7 @@ export const searchStock = (shopId: string, query: string): StockRecord[] => {
 
   return Object.entries(stock)
     .filter(([name]) => name.toLowerCase().includes(lowerQuery))
-    .map(([, record]) => record)
+    .map(([name, record]) => ({ [name]: record }))  // ✅ Return both name and record
     .slice(0, 10); // Return top 10 results
 };
 

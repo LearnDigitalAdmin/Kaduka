@@ -345,7 +345,7 @@ function SalesPage() {
                 autoComplete="off"
               />
 
-              {/* Autocomplete Dropdown */}
+              
               {showSuggestions && suggestions.length > 0 && (
                 <div
                   ref={suggestionsRef}
@@ -363,7 +363,7 @@ function SalesPage() {
                     </button>
                   ))}
                 </div>
-              )}
+              )} 
 
               {/* Stock Validation Message */}
               {stockValidation && (

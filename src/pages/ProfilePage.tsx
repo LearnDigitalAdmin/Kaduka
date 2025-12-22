@@ -16,6 +16,8 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import AddNewShopModal from '../components/modals/AddNewShopModal';
+import { RewardsModal } from '../components/modals/RewardsModal';
+
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ function ProfilePage() {
   const [loggingOut, setLoggingOut] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddShopModal, setShowAddShopModal] = useState(false);
+  const [showRewards, setShowRewards] = useState(false);
+
 
   const handleShopChange = (shopId: string) => {
     const shop = shops.find((s) => s.id === shopId);
@@ -131,6 +135,19 @@ function ProfilePage() {
               </div>
             </div>
           </div>
+
+          <div className="bg-gray-800 border border-gray-700 rounded-lg divide-y divide-gray-700">
+            <button
+              onClick={() => setShowRewards(true)}
+              className="w-full p-4 flex items-center justify-between hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <Store size={20} className="text-gray-400" />
+                <span className="text-white">Reward Customer</span>
+              </div>
+              <ChevronRight size={20} className="text-gray-400" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -194,6 +211,8 @@ function ProfilePage() {
           </div>
           <ChevronRight size={20} className="text-gray-400" />
         </button>
+
+        
       </div>
 
       {/* Logout Button */}
@@ -217,7 +236,7 @@ function ProfilePage() {
 
       {/* App Info */}
       <div className="text-center text-gray-400 text-sm pt-4">
-        <p>MyDuka v1.0.0</p>
+        <p>MyDuka v10.998.0.0</p>
         <p className="mt-1">Shop Management Made Easy</p>
       </div>
 
@@ -241,6 +260,13 @@ function ProfilePage() {
           setShowEditProfileModal(false);
           // Profile data will be automatically updated through auth store
         }}
+      />
+
+      <RewardsModal
+        isOpen={showRewards}
+        onClose={() => setShowRewards(false)}
+        shopId={currentShop!.id}
+        shopName={currentShop!.shopName}
       />
 
       {/* Add New Shop Modal */}

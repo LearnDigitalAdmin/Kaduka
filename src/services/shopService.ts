@@ -408,7 +408,7 @@ export const recordSale = async (
 
       // Update stock - decrease quantity
       const stockData = stockSnap.exists() ? stockSnap.data() : {};
-      if (stockData[productName]) {
+      if (stockData[productName] && stockData[productName].quantity >= quantity) {
         const newQuantity = Math.max(0, stockData[productName].quantity - quantity);
         stockData[productName].quantity = newQuantity;
         stockData[productName].lastUpdated = timestamp;
