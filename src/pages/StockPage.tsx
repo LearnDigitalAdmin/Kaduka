@@ -255,90 +255,92 @@ function StockPage() {
         </div>
       </div>
 
-      {/* Add/Edit Stock Form */}
+      {/* Add/Edit Stock Modal */}
       {showForm && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <h3 className="font-semibold text-white mb-4">
-            {editingProduct ? 'Update Stock' : 'Add New Stock'}
-          </h3>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Product Name</label>
-              <input
-                type="text"
-                value={productName}
-                onChange={(e) => setProductName(e.target.value)}
-                placeholder="e.g., Milk"
-                disabled={!!editingProduct || saving}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              />
-              {editingProduct && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Product name cannot be changed when editing
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="font-semibold text-white mb-4">
+              {editingProduct ? 'Update Stock' : 'Add New Stock'}
+            </h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Quantity</label>
+                <label className="block text-sm text-gray-400 mb-1">Product Name</label>
                 <input
-                  type="number"
-                  step="0.01"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  placeholder="100"
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={saving}
+                  type="text"
+                  value={productName}
+                  onChange={(e) => setProductName(e.target.value)}
+                  placeholder="e.g., Milk"
+                  disabled={!!editingProduct || saving}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                 />
+                {editingProduct && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Product name cannot be changed when editing
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Unit</label>
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={quantity}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    placeholder="100"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={saving}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Unit</label>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={saving}
+                  >
+                    <option value="pieces">Pieces</option>
+                    <option value="kg">Kilograms</option>
+                    <option value="liters">Liters</option>
+                    <option value="packets">Packets</option>
+                    <option value="boxes">Boxes</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      {editingProduct ? 'Updating...' : 'Adding...'}
+                    </>
+                  ) : editingProduct ? (
+                    'Update Stock'
+                  ) : (
+                    'Add Stock'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
                   disabled={saving}
                 >
-                  <option value="pieces">Pieces</option>
-                  <option value="kg">Kilograms</option>
-                  <option value="liters">Liters</option>
-                  <option value="packets">Packets</option>
-                  <option value="boxes">Boxes</option>
-                </select>
+                  Cancel
+                </button>
               </div>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    {editingProduct ? 'Updating...' : 'Adding...'}
-                  </>
-                ) : editingProduct ? (
-                  'Update Stock'
-                ) : (
-                  'Add Stock'
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 

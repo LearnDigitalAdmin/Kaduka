@@ -326,137 +326,139 @@ function SalesPage() {
         </div>
       )}
 
-      {/* New Sale Form */}
+      {/* New Sale Modal */}
       {showForm && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <h3 className="font-semibold text-white mb-4">Record New Sale</h3>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="relative">
-              <label className="block text-sm text-gray-400 mb-1">Product Name</label>
-              <input
-                ref={productInputRef}
-                type="text"
-                value={productName}
-                onChange={(e) => handleProductInput(e.target.value)}
-                onFocus={() => productName && setShowSuggestions(true)}
-                placeholder="e.g., Milk - type to search"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={saving}
-                autoComplete="off"
-              />
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="font-semibold text-white mb-4">Record New Sale</h3>
+            <form onSubmit={handleSubmit} className="space-y-3">
+              <div className="relative">
+                <label className="block text-sm text-gray-400 mb-1">Product Name</label>
+                <input
+                  ref={productInputRef}
+                  type="text"
+                  value={productName}
+                  onChange={(e) => handleProductInput(e.target.value)}
+                  onFocus={() => productName && setShowSuggestions(true)}
+                  placeholder="e.g., Milk - type to search"
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={saving}
+                  autoComplete="off"
+                />
 
-              
-              {showSuggestions && suggestions.length > 0 && (
-                <div
-                  ref={suggestionsRef}
-                  className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded-lg z-10 max-h-48 overflow-y-auto"
-                >
-                  {suggestions.map((product: any, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleProductSelect(Object.keys({ [Object.keys({ ...product })[0]]: product })[0])}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-600 text-white flex items-center justify-between border-b border-gray-600 last:border-b-0"
-                    >
-                      <span>{Object.keys({ ...product })[0]}</span>
-                      <span className="text-xs text-gray-400">{product.quantity} {product.unit}</span>
-                    </button>
-                  ))}
+                
+                {showSuggestions && suggestions.length > 0 && (
+                  <div
+                    ref={suggestionsRef}
+                    className="absolute top-full left-0 right-0 mt-1 bg-gray-700 border border-gray-600 rounded-lg z-10 max-h-48 overflow-y-auto"
+                  >
+                    {suggestions.map((product: any, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleProductSelect(Object.keys({ [Object.keys({ ...product })[0]]: product })[0])}
+                        className="w-full text-left px-3 py-2 hover:bg-gray-600 text-white flex items-center justify-between border-b border-gray-600 last:border-b-0"
+                      >
+                        <span>{Object.keys({ ...product })[0]}</span>
+                        <span className="text-xs text-gray-400">{product.quantity} {product.unit}</span>
+                      </button>
+                    ))}
+                  </div>
+                )} 
+
+                {/* Stock Validation Message */}
+                {stockValidation && (
+                  <div
+                    className={`mt-2 p-2 rounded text-sm flex items-center gap-2 ${
+                      stockValidation.available ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                    }`}
+                  >
+                    {stockValidation.available ? '✓' : '✕'} {stockValidation.message}
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={quantity}
+                    onChange={(e) => handleQuantityChange(e.target.value)}
+                    placeholder="10"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={saving}
+                  />
                 </div>
-              )} 
-
-              {/* Stock Validation Message */}
-              {stockValidation && (
-                <div
-                  className={`mt-2 p-2 rounded text-sm flex items-center gap-2 ${
-                    stockValidation.available ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                  }`}
-                >
-                  {stockValidation.available ? '✓' : '✕'} {stockValidation.message}
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Unit</label>
+                  <select
+                    value={unit}
+                    onChange={(e) => setUnit(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    disabled={saving}
+                  >
+                    <option value="pieces">Pieces</option>
+                    <option value="kg">Kilograms</option>
+                    <option value="liters">Liters</option>
+                    <option value="packets">Packets</option>
+                    <option value="boxes">Boxes</option>
+                  </select>
                 </div>
-              )}
-            </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Quantity</label>
+                <label className="block text-sm text-gray-400 mb-1">Price per Unit (KSh)</label>
                 <input
                   type="number"
                   step="0.01"
-                  value={quantity}
-                  onChange={(e) => handleQuantityChange(e.target.value)}
-                  placeholder="10"
+                  value={pricePerUnit}
+                  onChange={(e) => setPricePerUnit(e.target.value)}
+                  placeholder="50"
                   className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   disabled={saving}
                 />
               </div>
-              <div>
-                <label className="block text-sm text-gray-400 mb-1">Unit</label>
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+
+              {quantity && pricePerUnit && (
+                <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-sm text-gray-400">Total Amount</p>
+                  <p className="text-xl font-bold text-blue-400">
+                    KSh {(parseFloat(quantity) * parseFloat(pricePerUnit)).toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="flex-1 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <>
+                      <LoadingSpinner size="sm" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Record Sale'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    resetForm();
+                  }}
+                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
                   disabled={saving}
                 >
-                  <option value="pieces">Pieces</option>
-                  <option value="kg">Kilograms</option>
-                  <option value="liters">Liters</option>
-                  <option value="packets">Packets</option>
-                  <option value="boxes">Boxes</option>
-                </select>
+                  Cancel
+                </button>
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Price per Unit (KSh)</label>
-              <input
-                type="number"
-                step="0.01"
-                value={pricePerUnit}
-                onChange={(e) => setPricePerUnit(e.target.value)}
-                placeholder="50"
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                disabled={saving}
-              />
-            </div>
-
-            {quantity && pricePerUnit && (
-              <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                <p className="text-sm text-gray-400">Total Amount</p>
-                <p className="text-xl font-bold text-blue-400">
-                  KSh {(parseFloat(quantity) * parseFloat(pricePerUnit)).toLocaleString()}
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={saving}
-                className="flex-1 py-2 bg-green-500 hover:bg-green-600 disabled:bg-gray-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
-              >
-                {saving ? (
-                  <>
-                    <LoadingSpinner size="sm" />
-                    Saving...
-                  </>
-                ) : (
-                  'Record Sale'
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowForm(false);
-                  resetForm();
-                }}
-                className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
-                disabled={saving}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       )}
 

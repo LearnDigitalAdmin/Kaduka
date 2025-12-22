@@ -47,6 +47,7 @@ function ReportsPage() {
   const [generating, setGenerating] = useState(false);
   const [hasAccess, setHasAccess] = useState(false);
   const [remainingDays, setRemainingDays] = useState(0);
+  const [currentPlan, setCurrentPlan] = useState<'weekly' | 'monthly'>('weekly');
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
@@ -57,7 +58,7 @@ function ReportsPage() {
   // Report generation form
   const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('monthly');
+  const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
 
   useEffect(() => {
     checkAccess();
@@ -68,13 +69,20 @@ function ReportsPage() {
 
     try {
       setLoading(true);
-      const { hasAccess: access, remainingDays: days } = await checkPremiumAccess(
+      const { hasAccess: access, remainingDays: days, subscription } = await checkPremiumAccess(
         currentShop.id,
         user.uid
       );
 
       setHasAccess(access);
       setRemainingDays(days || 0);
+      
+      // CRITICAL FIX: Store the user's current subscription plan
+      if (subscription && subscription.plan) {
+        setCurrentPlan(subscription.plan);
+        // Set default report type based on plan
+        setReportType(subscription.plan === 'weekly' ? 'weekly' : 'monthly');
+      }
 
       if (access) {
         const storedReports = await getStoredReports(currentShop.id, 20);
@@ -90,11 +98,25 @@ function ReportsPage() {
   const handleGenerateReport = async () => {
     if (!currentShop || !user) return;
 
+    // CRITICAL FIX: Validate report type against subscription plan
+    if (currentPlan === 'weekly' && reportType === 'monthly') {
+      toast.error('Monthly reports require a monthly subscription. Please upgrade to generate monthly reports.');
+      return;
+    }
+
     const start = new Date(startDate);
     const end = new Date(endDate);
 
     if (start > end) {
       toast.error('Start date must be before end date');
+      return;
+    }
+
+    // CRITICAL FIX: Validate date range against subscription plan
+    const daysDifference = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (currentPlan === 'weekly' && daysDifference > 7) {
+      toast.error('Weekly subscription allows reports up to 7 days only. Please select a shorter date range or upgrade to monthly.');
       return;
     }
 
@@ -235,9 +257,10 @@ function ReportsPage() {
                 <p className="text-3xl font-bold text-green-400 mb-4">KSh 47</p>
                 <ul className="text-sm text-gray-400 space-y-2 mb-4">
                   <li>✓ 7 days premium access</li>
-                  <li>✓ Detailed weekly reports</li>
+                  <li>✓ Daily & weekly reports only</li>
+                  <li>✓ Max 7-day date range</li>
                   <li>✓ Export to JSON/CSV</li>
-                  <li>✓ Trend analysis</li>
+                  <li>✓ Basic trend analysis</li>
                 </ul>
                 <button
                   onClick={() => handleUpgrade('weekly')}
@@ -258,7 +281,8 @@ function ReportsPage() {
                 <p className="text-3xl font-bold text-blue-400 mb-4">KSh 197</p>
                 <ul className="text-sm text-gray-400 space-y-2 mb-4">
                   <li>✓ 30 days premium access</li>
-                  <li>✓ Detailed monthly reports</li>
+                  <li>✓ Daily, weekly & monthly reports</li>
+                  <li>✓ Unlimited date range</li>
                   <li>✓ Export to JSON/CSV</li>
                   <li>✓ Advanced trend analysis</li>
                   <li>✓ Historical reports</li>
@@ -302,7 +326,7 @@ function ReportsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Premium Reports</h1>
           <p className="text-sm text-gray-400">
-            Expires in {remainingDays} {remainingDays === 1 ? 'day' : 'days'}
+            {currentPlan === 'weekly' ? 'Weekly' : 'Monthly'} Plan - Expires in {remainingDays} {remainingDays === 1 ? 'day' : 'days'}
           </p>
         </div>
         <button
@@ -313,6 +337,26 @@ function ReportsPage() {
           <RefreshCw size={20} />
         </button>
       </div>
+
+      {/* CRITICAL FIX: Show upgrade notice for weekly users */}
+      {currentPlan === 'weekly' && (
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <BarChart3 size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-sm text-blue-300 mb-2">
+                You're on a <strong>Weekly Plan</strong>. You can generate daily and weekly reports for up to 7 days.
+              </p>
+              <button
+                onClick={() => handleUpgrade('monthly')}
+                className="text-sm text-blue-400 hover:text-blue-300 underline"
+              >
+                Upgrade to Monthly for unlimited monthly reports →
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Report Generation */}
       <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
@@ -348,7 +392,10 @@ function ReportsPage() {
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
+              {/* CRITICAL FIX: Disable monthly option for weekly subscribers */}
+              <option value="monthly" disabled={currentPlan === 'weekly'}>
+                Monthly {currentPlan === 'weekly' ? '(Monthly Plan Required)' : ''}
+              </option>
             </select>
           </div>
           <div className="flex items-end">
