@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { getSales, getExpenses, Sale, Expense } from '../services/shopService';
+import { checkPremiumAccess } from '../services/premiumReportsService';
 import { TrendingUp, TrendingDown, DollarSign, ShoppingCart, AlertCircle } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import EmptyState from '../components/common/EmptyState';
+import StockoutAlertsWidget from '../components/common/StockoutAlertsWidget';
 
 interface DashboardStats {
   todaySales: number;
@@ -13,6 +16,7 @@ interface DashboardStats {
 }
 
 function HomePage() {
+  const navigate = useNavigate();
   const { currentShop, user } = useAuthStore();
   const [stats, setStats] = useState<DashboardStats>({
     todaySales: 0,
@@ -23,10 +27,19 @@ function HomePage() {
   const [recentSales, setRecentSales] = useState<Sale[]>([]);
   const [recentExpenses, setRecentExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     loadDashboardData();
+    checkPremium();
   }, [currentShop]);
+
+  const checkPremium = async () => {
+    if (currentShop && user) {
+      const { hasAccess } = await checkPremiumAccess(currentShop.id, user.uid);
+      setIsPremium(hasAccess);
+    }
+  };
 
   const loadDashboardData = async () => {
     if (!currentShop) return;
@@ -57,6 +70,10 @@ function HomePage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleUpgradeToPremium = () => {
+    navigate('/reports');
   };
 
   if (!currentShop) {
@@ -131,6 +148,15 @@ function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Stockout Alerts Widget */}
+      {currentShop && (
+        <StockoutAlertsWidget
+          shopId={currentShop.id}
+          isPremium={isPremium}
+          onUpgrade={handleUpgradeToPremium}
+        />
+      )}
 
       {/* Recent Sales */}
       <div>

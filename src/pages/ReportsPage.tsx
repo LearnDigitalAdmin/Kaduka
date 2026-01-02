@@ -9,10 +9,21 @@ import {
   exportReportAsJSON,
   exportReportAsCSV,
 } from '../services/premiumReportsService';
-import { Download, TrendingUp, DollarSign, TrendingDown, BarChart3, Calendar, RefreshCw } from 'lucide-react';
+import { getSales, getExpenses } from '../services/shopService';
+import { generateStockoutAlerts } from '../services/analyticsService';
+import {
+  generateBusinessInsights,
+  getPeakHoursAnalysis,
+  getDayPerformanceAnalysis,
+  getProductPerformanceScores,
+} from '../services/insightsService';
+import { Download, BarChart3, RefreshCw, Lightbulb } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import EmptyState from '../components/common/EmptyState';
 import SubscriptionPaymentModal from '../components/payments/SubscriptionPaymentModal';
+import ROICalculator from '../services/ROICalculator';
+import BusinessInsightsWidget from '../components/common/BusinessInsightsWidget';
+import AdvancedAnalyticsDashboard from '../components/common/AdvancedAnalyticsDashboard';
 
 interface Report {
   shopId: string;
@@ -51,6 +62,14 @@ function ReportsPage() {
   const [reports, setReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
 
+  // Insights and analytics
+  const [insights, setInsights] = useState<any[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [showAdvancedAnalytics, setShowAdvancedAnalytics] = useState(false);
+  const [peakHours, setPeakHours] = useState<any[]>([]);
+  const [dayPerformance, setDayPerformance] = useState<any[]>([]);
+  const [productScores, setProductScores] = useState<any[]>([]);
+
   // Subscription modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<'weekly' | 'monthly'>('monthly');
@@ -63,6 +82,12 @@ function ReportsPage() {
   useEffect(() => {
     checkAccess();
   }, [currentShop, user]);
+
+  useEffect(() => {
+    if (hasAccess && selectedReport) {
+      loadInsights();
+    }
+  }, [selectedReport, hasAccess]);
 
   const checkAccess = async () => {
     if (!currentShop || !user) return;
@@ -77,16 +102,19 @@ function ReportsPage() {
       setHasAccess(access);
       setRemainingDays(days || 0);
       
-      // CRITICAL FIX: Store the user's current subscription plan
       if (subscription && subscription.plan) {
         setCurrentPlan(subscription.plan);
-        // Set default report type based on plan
         setReportType(subscription.plan === 'weekly' ? 'weekly' : 'monthly');
       }
 
       if (access) {
         const storedReports = await getStoredReports(currentShop.id, 20);
         setReports(storedReports as Report[]);
+        
+        // Auto-select most recent report
+        if (storedReports.length > 0 && !selectedReport) {
+          setSelectedReport(storedReports[0] as Report);
+        }
       }
     } catch (error) {
       console.error('Error checking premium access:', error);
@@ -95,10 +123,48 @@ function ReportsPage() {
     }
   };
 
+  const loadInsights = async () => {
+    if (!currentShop || !selectedReport) return;
+
+    try {
+      setInsightsLoading(true);
+
+      // Load sales and expenses for the report period
+      const [sales, expenses, stockoutAlerts] = await Promise.all([
+        getSales(currentShop.id, selectedReport.startDate, selectedReport.endDate),
+        getExpenses(currentShop.id, selectedReport.startDate, selectedReport.endDate),
+        generateStockoutAlerts(currentShop.id, 7),
+      ]);
+
+      // Generate insights
+      const businessInsights = await generateBusinessInsights(
+        sales,
+        expenses,
+        stockoutAlerts,
+        currentPlan
+      );
+      setInsights(businessInsights);
+
+      // Monthly exclusive: Advanced analytics
+      if (currentPlan === 'monthly') {
+        const peakHoursData = getPeakHoursAnalysis(sales);
+        const dayPerfData = getDayPerformanceAnalysis(sales);
+        const productScoresData = getProductPerformanceScores(sales);
+
+        setPeakHours(peakHoursData);
+        setDayPerformance(dayPerfData);
+        setProductScores(productScoresData);
+      }
+    } catch (error) {
+      console.error('Error loading insights:', error);
+    } finally {
+      setInsightsLoading(false);
+    }
+  };
+
   const handleGenerateReport = async () => {
     if (!currentShop || !user) return;
 
-    // CRITICAL FIX: Validate report type against subscription plan
     if (currentPlan === 'weekly' && reportType === 'monthly') {
       toast.error('Monthly reports require a monthly subscription. Please upgrade to generate monthly reports.');
       return;
@@ -112,7 +178,6 @@ function ReportsPage() {
       return;
     }
 
-    // CRITICAL FIX: Validate date range against subscription plan
     const daysDifference = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     
     if (currentPlan === 'weekly' && daysDifference > 7) {
@@ -147,20 +212,12 @@ function ReportsPage() {
     }
   };
 
-  /**
-   * Handle upgrade button click
-   * Opens the subscription payment modal with phone number input
-   */
   const handleUpgrade = (plan: 'weekly' | 'monthly') => {
     if (!currentShop || !user) return;
     setSelectedPlan(plan);
     setShowPaymentModal(true);
   };
 
-  /**
-   * Handle successful payment
-   * Refresh access status and close modal
-   */
   const handlePaymentSuccess = async () => {
     await checkAccess();
     setShowPaymentModal(false);
@@ -184,7 +241,6 @@ function ReportsPage() {
         filename += '.csv';
       }
 
-      // Create download link
       const element = document.createElement('a');
       const file = new Blob([content], {
         type: format === 'json' ? 'application/json' : 'text/csv',
@@ -199,21 +255,6 @@ function ReportsPage() {
     } catch (error) {
       console.error('Error exporting report:', error);
       toast.error('Failed to export report');
-    }
-  };
-
-  const handleDownloadWhatsApp = (downloadUrl?: string) => {
-    if (!downloadUrl) {
-      toast.error('Download URL not available');
-      return;
-    }
-
-    try {
-      window.open(downloadUrl, '_blank');
-      toast.success('Opening WhatsApp download link...');
-    } catch (error) {
-      console.error('Error opening download link:', error);
-      toast.error('Failed to open download link');
     }
   };
 
@@ -242,25 +283,36 @@ function ReportsPage() {
       <div className="p-4 space-y-4">
         <h1 className="text-2xl font-bold text-white">Premium Reports</h1>
 
+        {/* ROI Calculator */}
+        {currentShop && (
+          <ROICalculator shopId={currentShop.id} onUpgrade={() => handleUpgrade('monthly')} />
+        )}
+
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-lg p-6">
           <div className="text-center">
             <BarChart3 size={48} className="mx-auto mb-4 text-blue-400" />
             <h2 className="text-xl font-semibold text-white mb-2">Unlock Premium Reports</h2>
             <p className="text-gray-400 mb-6">
-              Get detailed analytics, trends, and insights about your business with premium reports.
+              Get detailed analytics, trends, insights, and actionable recommendations for your business.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
               {/* Weekly Plan */}
-              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-2">Weekly</h3>
-                <p className="text-3xl font-bold text-green-400 mb-4">KSh 47</p>
+              <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 text-left">
+                <h3 className="text-lg font-semibold text-white mb-2">Weekly Plan</h3>
+                <p className="text-3xl font-bold text-green-400 mb-4">KSh 47/week</p>
                 <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                  <li>✓ 7 days premium access</li>
-                  <li>✓ Daily & weekly reports only</li>
-                  <li>✓ Max 7-day date range</li>
-                  <li>✓ Export to JSON/CSV</li>
-                  <li>✓ Basic trend analysis</li>
+                  <li>✅ 7 days premium access</li>
+                  <li>✅ Daily & weekly reports</li>
+                  <li>✅ Max 7-day date range</li>
+                  <li>✅ Basic trends & insights</li>
+                  <li>✅ Top 5 products analysis</li>
+                  <li>✅ Expense breakdown</li>
+                  <li>✅ Export to JSON/CSV</li>
+                  <li>❌ NO monthly reports</li>
+                  <li>❌ NO advanced analytics</li>
+                  <li>❌ NO rewards system</li>
+                  <li>❌ NO peak hour analysis</li>
                 </ul>
                 <button
                   onClick={() => handleUpgrade('weekly')}
@@ -271,22 +323,50 @@ function ReportsPage() {
               </div>
 
               {/* Monthly Plan */}
-              <div className="bg-gray-800 border border-blue-500/20 rounded-lg p-4 ring-1 ring-blue-500/20">
+              <div className="bg-gray-800 border border-blue-500/30 rounded-lg p-4 ring-2 ring-blue-500/30 text-left">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-lg font-semibold text-white">Monthly</h3>
+                  <h3 className="text-lg font-semibold text-white">Monthly Plan</h3>
                   <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded font-semibold">
-                    POPULAR
+                    BEST VALUE
                   </span>
                 </div>
-                <p className="text-3xl font-bold text-blue-400 mb-4">KSh 197</p>
-                <ul className="text-sm text-gray-400 space-y-2 mb-4">
-                  <li>✓ 30 days premium access</li>
-                  <li>✓ Daily, weekly & monthly reports</li>
-                  <li>✓ Unlimited date range</li>
-                  <li>✓ Export to JSON/CSV</li>
-                  <li>✓ Advanced trend analysis</li>
-                  <li>✓ Historical reports</li>
-                </ul>
+                <p className="text-3xl font-bold text-blue-400 mb-4">KSh 197/month</p>
+                <div className="space-y-3 mb-4">
+                  <div>
+                    <p className="text-xs font-semibold text-blue-400 mb-1 uppercase">Everything in Weekly +</p>
+                    <ul className="text-sm text-gray-400 space-y-1">
+                      <li>✅ 30 days premium access</li>
+                      <li>✅ Monthly reports & unlimited range</li>
+                      <li>✅ Advanced trend analysis</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-green-400 mb-1 uppercase">🎯 Smart Insights</p>
+                    <ul className="text-sm text-gray-400 space-y-1">
+                      <li>✅ Actionable recommendations</li>
+                      <li>✅ Pricing optimization alerts</li>
+                      <li>✅ Stockout predictions</li>
+                      <li>✅ Sales forecasting</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-purple-400 mb-1 uppercase">📊 Advanced Analytics</p>
+                    <ul className="text-sm text-gray-400 space-y-1">
+                      <li>✅ Peak hour staffing analysis</li>
+                      <li>✅ Day-of-week optimization</li>
+                      <li>✅ Product performance scoring</li>
+                      <li>✅ Customer segmentation</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-yellow-400 mb-1 uppercase">🪙 Rewards System</p>
+                    <ul className="text-sm text-gray-400 space-y-1">
+                      <li>✅ Full customer loyalty program</li>
+                      <li>✅ VIP customer tracking</li>
+                      <li>✅ Automated campaigns</li>
+                    </ul>
+                  </div>
+                </div>
                 <button
                   onClick={() => handleUpgrade('monthly')}
                   className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors"
@@ -297,7 +377,7 @@ function ReportsPage() {
             </div>
 
             <p className="text-xs text-gray-500">
-              Secure payment powered by Paystack. No recurring charges without confirmation.
+              Secure payment via M-Pesa. Cancel anytime.
             </p>
           </div>
         </div>
@@ -326,32 +406,32 @@ function ReportsPage() {
         <div>
           <h1 className="text-2xl font-bold text-white">Premium Reports</h1>
           <p className="text-sm text-gray-400">
-            {currentPlan === 'weekly' ? 'Weekly' : 'Monthly'} Plan - Expires in {remainingDays} {remainingDays === 1 ? 'day' : 'days'}
+            {currentPlan === 'weekly' ? 'Weekly' : 'Monthly'} Plan - {remainingDays} {remainingDays === 1 ? 'day' : 'days'} remaining
           </p>
         </div>
         <button
           onClick={checkAccess}
           className="p-2 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
-          title="Refresh access status"
+          title="Refresh"
         >
           <RefreshCw size={20} />
         </button>
       </div>
 
-      {/* CRITICAL FIX: Show upgrade notice for weekly users */}
+      {/* Weekly plan upgrade notice */}
       {currentPlan === 'weekly' && (
         <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
           <div className="flex items-start gap-3">
-            <BarChart3 size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
+            <Lightbulb size={20} className="text-blue-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm text-blue-300 mb-2">
-                You're on a <strong>Weekly Plan</strong>. You can generate daily and weekly reports for up to 7 days.
+                <strong>Weekly Plan:</strong> You get daily & weekly reports (max 7 days), basic insights, and export features.
               </p>
               <button
                 onClick={() => handleUpgrade('monthly')}
                 className="text-sm text-blue-400 hover:text-blue-300 underline"
               >
-                Upgrade to Monthly for unlimited monthly reports →
+                Upgrade to Monthly for advanced analytics, peak hours, product scoring & rewards →
               </button>
             </div>
           </div>
@@ -392,9 +472,8 @@ function ReportsPage() {
             >
               <option value="daily">Daily</option>
               <option value="weekly">Weekly</option>
-              {/* CRITICAL FIX: Disable monthly option for weekly subscribers */}
               <option value="monthly" disabled={currentPlan === 'weekly'}>
-                Monthly {currentPlan === 'weekly' ? '(Monthly Plan Required)' : ''}
+                Monthly {currentPlan === 'weekly' ? '(Upgrade Required)' : ''}
               </option>
             </select>
           </div>
@@ -422,137 +501,89 @@ function ReportsPage() {
 
       {/* Selected Report Details */}
       {selectedReport && (
-        <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-white">
-              {selectedReport.reportType === 'daily'
-                ? 'Daily Report'
-                : selectedReport.reportType === 'weekly'
-                ? 'Weekly Report'
-                : 'Monthly Report'}{' '}
-              - {selectedReport.dateCode}
-            </h3>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleExport('json')}
-                className="px-3 py-1 text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-colors flex items-center gap-1"
-              >
-                <Download size={14} />
-                JSON
-              </button>
-              <button
-                onClick={() => handleExport('csv')}
-                className="px-3 py-1 text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-colors flex items-center gap-1"
-              >
-                <Download size={14} />
-                CSV
-              </button>
-              {selectedReport.downloadUrl && (
+        <>
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-white">
+                {selectedReport.reportType.charAt(0).toUpperCase() + selectedReport.reportType.slice(1)} Report - {selectedReport.dateCode}
+              </h3>
+              <div className="flex gap-2">
                 <button
-                  onClick={() => handleDownloadWhatsApp(selectedReport.downloadUrl)}
+                  onClick={() => handleExport('json')}
                   className="px-3 py-1 text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-colors flex items-center gap-1"
                 >
                   <Download size={14} />
-                  WhatsApp
+                  JSON
                 </button>
+                <button
+                  onClick={() => handleExport('csv')}
+                  className="px-3 py-1 text-sm bg-green-500/20 text-green-400 hover:bg-green-500/30 rounded-lg transition-colors flex items-center gap-1"
+                >
+                  <Download size={14} />
+                  CSV
+                </button>
+              </div>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Total Sales</p>
+                <p className="text-xl font-bold text-blue-400">KSh {selectedReport.data.totalSales.toLocaleString()}</p>
+              </div>
+              <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Expenses</p>
+                <p className="text-xl font-bold text-red-400">KSh {selectedReport.data.totalExpenses.toLocaleString()}</p>
+              </div>
+              <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Profit</p>
+                <p className="text-xl font-bold text-green-400">KSh {selectedReport.data.profit.toLocaleString()}</p>
+              </div>
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Margin</p>
+                <p className="text-xl font-bold text-purple-400">
+                  {selectedReport.data.totalSales > 0
+                    ? ((selectedReport.data.profit / selectedReport.data.totalSales) * 100).toFixed(1)
+                    : '0.0'}%
+                </p>
+              </div>
+              <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border border-cyan-500/20 rounded-lg p-3">
+                <p className="text-xs text-gray-400 mb-1">Transactions</p>
+                <p className="text-xl font-bold text-cyan-400">{selectedReport.data.transactionCount}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Business Insights */}
+          <BusinessInsightsWidget
+            insights={insights}
+            plan={currentPlan}
+            loading={insightsLoading}
+          />
+
+          {/* Advanced Analytics (Monthly Only) */}
+          {currentPlan === 'monthly' && peakHours.length > 0 && (
+            <>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-white">Advanced Analytics</h2>
+                <button
+                  onClick={() => setShowAdvancedAnalytics(!showAdvancedAnalytics)}
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  {showAdvancedAnalytics ? 'Hide' : 'Show'} Details
+                </button>
+              </div>
+              
+              {showAdvancedAnalytics && (
+                <AdvancedAnalyticsDashboard
+                  peakHours={peakHours}
+                  dayPerformance={dayPerformance}
+                  productScores={productScores}
+                />
               )}
-            </div>
-          </div>
-
-          {/* Report Summary Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-            <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-1">Total Sales</p>
-              <p className="text-xl font-bold text-blue-400">KSh {selectedReport.data.totalSales.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-1">Total Expenses</p>
-              <p className="text-xl font-bold text-red-400">KSh {selectedReport.data.totalExpenses.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-1">Profit</p>
-              <p className="text-xl font-bold text-green-400">KSh {selectedReport.data.profit.toLocaleString()}</p>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-1">Profit Margin</p>
-              <p className="text-xl font-bold text-purple-400">
-                {selectedReport.data.profitMargin !== undefined
-                  ? selectedReport.data.profitMargin.toFixed(1)
-                  : selectedReport.data.totalSales > 0
-                  ? ((selectedReport.data.profit / selectedReport.data.totalSales) * 100).toFixed(1)
-                  : '0.0'
-                }%
-              </p>
-            </div>
-
-            <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border border-cyan-500/20 rounded-lg p-3">
-              <p className="text-xs text-gray-400 mb-1">Transactions</p>
-              <p className="text-xl font-bold text-cyan-400">{selectedReport.data.transactionCount}</p>
-            </div>
-          </div>
-
-          {/* Trends */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                {selectedReport.data.trends.salesTrend === 'increasing' ? (
-                  <TrendingUp size={16} className="text-green-400" />
-                ) : selectedReport.data.trends.salesTrend === 'decreasing' ? (
-                  <TrendingDown size={16} className="text-red-400" />
-                ) : (
-                  <TrendingUp size={16} className="text-gray-400" />
-                )}
-                <p className="text-sm text-gray-400">Sales Trend</p>
-              </div>
-              <p className="text-white font-semibold capitalize">{selectedReport.data.trends.salesTrend}</p>
-            </div>
-
-            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign size={16} className="text-blue-400" />
-                <p className="text-sm text-gray-400">Avg Daily Sales</p>
-              </div>
-              <p className="text-white font-semibold">KSh {selectedReport.data.trends.averageDailySales.toLocaleString()}</p>
-            </div>
-          </div>
-
-          {/* Best and Worst Days */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
-            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar size={16} className="text-green-400" />
-                <p className="text-sm text-gray-400">Best Day</p>
-              </div>
-              <p className="text-white font-semibold">{new Date(selectedReport.data.trends.bestDay).toLocaleDateString()}</p>
-            </div>
-
-            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <Calendar size={16} className="text-red-400" />
-                <p className="text-sm text-gray-400">Worst Day</p>
-              </div>
-              <p className="text-white font-semibold">{new Date(selectedReport.data.trends.worstDay).toLocaleDateString()}</p>
-            </div>
-          </div>
-
-          {/* Top Products */}
-          {selectedReport.data.topProducts.length > 0 && (
-            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
-              <p className="text-sm font-semibold text-white mb-3">Top Products</p>
-              <div className="space-y-2 text-sm">
-                {selectedReport.data.topProducts.slice(0, 5).map((product, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-2 bg-gray-600/30 rounded">
-                    <span className="text-gray-300">{product.name}</span>
-                    <span className="text-gray-400">{product.quantity} units</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            </>
           )}
-        </div>
+        </>
       )}
 
       {/* Historical Reports */}
@@ -573,12 +604,7 @@ function ReportsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-white font-medium">
-                      {report.reportType === 'daily'
-                        ? 'Daily'
-                        : report.reportType === 'weekly'
-                        ? 'Weekly'
-                        : 'Monthly'}{' '}
-                      Report - {report.dateCode}
+                      {report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1)} Report - {report.dateCode}
                     </p>
                     <p className="text-xs text-gray-400">
                       {new Date(report.startDate).toLocaleDateString()} to{' '}
@@ -586,9 +612,7 @@ function ReportsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-green-400 font-semibold">
-                      KSh {report.data.profit.toLocaleString()}
-                    </p>
+                    <p className="text-green-400 font-semibold">KSh {report.data.profit.toLocaleString()}</p>
                     <p className="text-xs text-gray-400">Profit</p>
                   </div>
                 </div>

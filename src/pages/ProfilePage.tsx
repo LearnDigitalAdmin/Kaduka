@@ -11,13 +11,16 @@ import {
   Phone,
   MapPin,
   Check,
+  Crown,
+  Lock,
 } from 'lucide-react';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import EditProfileModal from '../components/modals/EditProfileModal';
 import AddNewShopModal from '../components/modals/AddNewShopModal';
 import { RewardsModal } from '../components/modals/RewardsModal';
-
+import PremiumLockScreen from '../components/common/PremiumLockScreen';
+import { checkPremiumAccess } from '../services/premiumReportsService';
 
 function ProfilePage() {
   const navigate = useNavigate();
@@ -27,7 +30,19 @@ function ProfilePage() {
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [showAddShopModal, setShowAddShopModal] = useState(false);
   const [showRewards, setShowRewards] = useState(false);
+  const [showRewardsLock, setShowRewardsLock] = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
 
+  // Check premium access when shop changes
+  useState(() => {
+    const checkAccess = async () => {
+      if (currentShop && user) {
+        const { hasAccess } = await checkPremiumAccess(currentShop.id, user.uid);
+        setIsPremium(hasAccess);
+      }
+    };
+    checkAccess();
+  });
 
   const handleShopChange = (shopId: string) => {
     const shop = shops.find((s) => s.id === shopId);
@@ -52,6 +67,19 @@ function ProfilePage() {
     }
   };
 
+  const handleRewardsClick = () => {
+    if (!isPremium) {
+      setShowRewardsLock(true);
+    } else {
+      setShowRewards(true);
+    }
+  };
+
+  const handleUpgradeToPremium = () => {
+    navigate('/reports'); // Navigate to reports page where they can subscribe
+    toast.info('Upgrade to Premium to unlock this feature');
+  };
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
@@ -69,6 +97,12 @@ function ProfilePage() {
             </h2>
             <p className="text-sm text-gray-400">Shop Owner</p>
           </div>
+          {isPremium && (
+            <div className="flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-yellow-500 to-orange-500 rounded-full">
+              <Crown size={14} className="text-white" />
+              <span className="text-white text-xs font-bold">PREMIUM</span>
+            </div>
+          )}
         </div>
 
         <div className="space-y-3">
@@ -135,19 +169,6 @@ function ProfilePage() {
               </div>
             </div>
           </div>
-
-          <div className="bg-gray-800 border border-gray-700 rounded-lg divide-y divide-gray-700">
-            <button
-              onClick={() => setShowRewards(true)}
-              className="w-full p-4 flex items-center justify-between hover:bg-gray-700 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Store size={20} className="text-gray-400" />
-                <span className="text-white">Reward Customer</span>
-              </div>
-              <ChevronRight size={20} className="text-gray-400" />
-            </button>
-          </div>
         </div>
       )}
 
@@ -212,7 +233,22 @@ function ProfilePage() {
           <ChevronRight size={20} className="text-gray-400" />
         </button>
 
-        
+        <button
+          onClick={handleRewardsClick}
+          className="w-full p-4 flex items-center justify-between hover:bg-gray-700 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <Store size={20} className="text-gray-400" />
+            <span className="text-white">Customer Rewards</span>
+            {!isPremium && (
+              <div className="flex items-center gap-1 px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/50 rounded">
+                <Lock size={12} className="text-yellow-400" />
+                <span className="text-yellow-400 text-xs font-semibold">Premium</span>
+              </div>
+            )}
+          </div>
+          <ChevronRight size={20} className="text-gray-400" />
+        </button>
       </div>
 
       {/* Logout Button */}
@@ -258,16 +294,38 @@ function ProfilePage() {
         onClose={() => setShowEditProfileModal(false)}
         onSuccess={() => {
           setShowEditProfileModal(false);
-          // Profile data will be automatically updated through auth store
         }}
       />
 
-      <RewardsModal
-        isOpen={showRewards}
-        onClose={() => setShowRewards(false)}
-        shopId={currentShop!.id}
-        shopName={currentShop!.shopName}
-      />
+      {/* Rewards Modal (Premium) */}
+      {currentShop && isPremium && (
+        <RewardsModal
+          isOpen={showRewards}
+          onClose={() => setShowRewards(false)}
+          shopId={currentShop.id}
+          shopName={currentShop.shopName}
+        />
+      )}
+
+      {/* Rewards Lock Screen (Free Users) */}
+      {showRewardsLock && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-gray-900 p-4 border-b border-gray-700 flex items-center justify-between">
+              <h2 className="text-xl font-bold text-white">Customer Rewards System</h2>
+              <button
+                onClick={() => setShowRewardsLock(false)}
+                className="text-gray-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <PremiumLockScreen feature="rewards" onUpgrade={handleUpgradeToPremium} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add New Shop Modal */}
       <AddNewShopModal
@@ -275,7 +333,6 @@ function ProfilePage() {
         onClose={() => setShowAddShopModal(false)}
         onSuccess={() => {
           setShowAddShopModal(false);
-          // Shops will be reloaded on next auth check
         }}
       />
     </div>
