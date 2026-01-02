@@ -505,7 +505,9 @@ function ReportsPage() {
           <div className="bg-gray-800 border border-gray-700 rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-white">
-                {selectedReport.reportType.charAt(0).toUpperCase() + selectedReport.reportType.slice(1)} Report - {selectedReport.dateCode}
+                {selectedReport.reportType 
+                  ? selectedReport.reportType.charAt(0).toUpperCase() + selectedReport.reportType.slice(1) 
+                  : 'Weekly'} Report - {selectedReport.dateCode}
               </h3>
               <div className="flex gap-2">
                 <button
@@ -529,27 +531,55 @@ function ReportsPage() {
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
               <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Total Sales</p>
-                <p className="text-xl font-bold text-blue-400">KSh {selectedReport.data.totalSales.toLocaleString()}</p>
+                {
+                  selectedReport.data?.totalSales !== undefined ? (
+                    <p className="text-xl font-bold text-blue-400">KSh {selectedReport.data.totalSales.toLocaleString()}</p>
+                  ) : (
+                    <p className="text-xl font-bold text-blue-400">KSh 0</p>
+                  )
+                }
+                {/* <p className="text-xl font-bold text-blue-400">KSh {selectedReport.data?.totalSales?.toLocaleString()}</p> */}
               </div>
               <div className="bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Expenses</p>
-                <p className="text-xl font-bold text-red-400">KSh {selectedReport.data.totalExpenses.toLocaleString()}</p>
+                {
+                  selectedReport.data?.totalExpenses !== undefined ? (
+                    <p className="text-xl font-bold text-red-400">KSh {selectedReport.data.totalExpenses.toLocaleString()}</p>
+                  ) : (
+                    <p className="text-xl font-bold text-red-400">KSh 0</p>
+                  )
+                }
+                {/* <p className="text-xl font-bold text-red-400">KSh {selectedReport.data.totalExpenses.toLocaleString()}</p> */}
               </div>
               <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 border border-green-500/20 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Profit</p>
-                <p className="text-xl font-bold text-green-400">KSh {selectedReport.data.profit.toLocaleString()}</p>
+                {
+                  selectedReport.data?.profit !== undefined ? (
+                    <p className="text-xl font-bold text-green-400">KSh {selectedReport.data.profit.toLocaleString()}</p>
+                  ) : (
+                    <p className="text-xl font-bold text-green-400">KSh 0</p>
+                  )
+                }
+                {/* <p className="text-xl font-bold text-green-400">KSh {selectedReport.data.profit.toLocaleString()}</p> */}
               </div>
               <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-500/20 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Margin</p>
                 <p className="text-xl font-bold text-purple-400">
-                  {selectedReport.data.totalSales > 0
+                  {selectedReport.data?.totalSales !== undefined && selectedReport.data.totalSales > 0
                     ? ((selectedReport.data.profit / selectedReport.data.totalSales) * 100).toFixed(1)
                     : '0.0'}%
                 </p>
               </div>
               <div className="bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 border border-cyan-500/20 rounded-lg p-3">
                 <p className="text-xs text-gray-400 mb-1">Transactions</p>
-                <p className="text-xl font-bold text-cyan-400">{selectedReport.data.transactionCount}</p>
+                {
+                  selectedReport.data?.transactionCount !== undefined ? (
+                    <p className="text-xl font-bold text-cyan-400">{selectedReport.data.transactionCount}</p>
+                  ) : (
+                    <p className="text-xl font-bold text-cyan-400">0</p>
+                  )
+                }
+                {/* <p className="text-xl font-bold text-cyan-400">{selectedReport.data.transactionCount}</p> */}
               </div>
             </div>
           </div>
@@ -604,7 +634,9 @@ function ReportsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-white font-medium">
-                      {report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1)} Report - {report.dateCode}
+                      {report.reportType 
+                  ? report.reportType.charAt(0).toUpperCase() + report.reportType.slice(1) 
+                  : 'Weekly'} Report - {report.dateCode}
                     </p>
                     <p className="text-xs text-gray-400">
                       {new Date(report.startDate).toLocaleDateString()} to{' '}
@@ -612,7 +644,14 @@ function ReportsPage() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-green-400 font-semibold">KSh {report.data.profit.toLocaleString()}</p>
+                    {
+                      report.data?.profit !== undefined ? (
+                        <p className="text-green-400 font-semibold">KSh {report.data.profit.toLocaleString()}</p>
+                      ) : (
+                        <p className="text-green-400 font-semibold">KSh 0</p>
+                      )
+                    }
+                    {/* <p className="text-green-400 font-semibold">KSh {report.data.profit.toLocaleString()}</p> */}
                     <p className="text-xs text-gray-400">Profit</p>
                   </div>
                 </div>

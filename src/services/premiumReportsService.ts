@@ -279,7 +279,7 @@ export const generateReport = async (
       dateCode: dailyBreakdown[0]?.date.replace(/-/g, '') || '',
       startDate,
       endDate,
-      reportType,
+      reportType: reportType || 'weekly',
       data: {
         totalSales,
         totalExpenses,
